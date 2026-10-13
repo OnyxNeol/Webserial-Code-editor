@@ -8,3 +8,16 @@
 - The web workbench, syntax grammars, and themes load from source. Browser extension bundles are not compiled yet; IntelliSense and features supplied by those extensions need additional extension-specific dependency installation and `npm run compile-web`. Terminal/native filesystem/backend features are not provided by this standalone browser development server. Do not describe this as the full desktop IDE.
 - Verification: `curl -f http://localhost:3000/` and request `/static/sources/out/vs/workbench/workbench.web.main.internal.js` plus its `.css`. Then verify the real preview renders `.monaco-workbench`, open a new unsaved text editor, and type into it. Check runtime errors as well as HTTP status; an HTTP 200 page alone previously rendered blank.
 - `vscode/out`, dependency directories, and generated codicon fonts are build outputs, not source to commit. Never serve the old prebuilt `app-vscode-web` image: Compose uses plain `node:24-bookworm` with the checkout bind-mounted.
+
+## Board flashing pipeline
+
+- `tools/flasher/server.py` is a FastAPI service that compiles and flashes code to 1000+ hardware boards via PlatformIO Core. It runs as a separate compose service (`flasher`) on port 8001, built from `Dockerfile.flasher` (Python 3.12 + platformio + fastapi + uvicorn).
+- API endpoints: `GET /api/boards` (list all boards), `GET /api/boards/search?q=` (search), `GET /api/devices` (serial ports), `POST /api/compile` (compile only), `POST /api/flash` (compile + flash), `POST /api/upload` (upload pre-compiled firmware). See `tools/flasher/README.md` for full API docs.
+- Workspace control endpoints give the AI full power: `GET /api/workspace/files`, `POST /api/workspace/read`, `POST /api/workspace/write`, `POST /api/workspace/command` (shell execution), `DELETE /api/workspace/file`.
+- The `workspace_data` Docker volume is shared between `vscode-web` (mounted at `/repo/workspace`) and `flasher` (mounted at `/repo/workspace`) so files written by the AI are immediately visible in VS Code.
+- `pio_core` volume caches PlatformIO platforms/toolchains across restarts. First board compile downloads platform packages (can take minutes).
+- VS Code web receives `FLASHER_API_URL=http://flasher:8001` so it can call the flasher service by container name.
+
+## Disabled auto-completions
+
+- VS Code editor defaults have been modified in `vscode/src/vs/editor/common/config/editorOptions.ts` and `editorConfigurationSchema.ts` to disable all auto-completions: `quickSuggestions.other` → `'off'`, `suggestOnTriggerCharacters` → `false`, `inlineSuggest.enabled` → `false`, `parameterHints.enabled` → `false`, `wordBasedSuggestions` → `'off'`. These are source-level defaults; users can still re-enable via settings if desired.

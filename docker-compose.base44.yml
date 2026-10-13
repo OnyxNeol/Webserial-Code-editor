@@ -11,11 +11,13 @@ services:
       - vscode_node_modules:/vscode/node_modules
       - vscode_build_node_modules:/vscode/build/node_modules
       - vscode_build:/vscode/.build
+      - workspace_data:/repo/workspace
     environment:
       - BASE44_PREVIEW_MODE
       - BASE44_PUBLIC_HOST_SUFFIX
       - CHOKIDAR_USEPOLLING=true
       - CHOKIDAR_INTERVAL=1000
+      - FLASHER_API_URL=http://flasher:8001
     # Browser-only development does not need Electron/native dependency hooks.
     # Install from the checkout's lockfiles after volumes have been mounted.
     command:
@@ -27,6 +29,9 @@ services:
         npm --prefix build ci --ignore-scripts --no-audit --no-fund
         exec node /base44/vscode-dev.mjs
     restart: on-failure
+    depends_on:
+      flasher:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>{if(!r.ok)throw Error('VS Code web is not responsive');return r.text()}).then(t=>{if(!t.includes('workbench'))throw Error('Workbench page missing')}).catch(e=>{console.error(e.message);process.exit(1)})"]
       interval: 15s
@@ -34,7 +39,32 @@ services:
       retries: 5
       start_period: 300s
 
+  flasher:
+    build:
+      context: .
+      dockerfile: Dockerfile.flasher
+    working_dir: /app
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./tools/flasher:/app
+      - workspace_data:/repo/workspace
+      - pio_core:/root/.platformio
+    environment:
+      - WORKSPACE_DIR=/repo/workspace
+      - BASE44_PREVIEW_MODE
+    command: ["python", "server.py"]
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/api/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
 volumes:
   vscode_node_modules:
   vscode_build_node_modules:
   vscode_build:
+  workspace_data:
+  pio_core:
