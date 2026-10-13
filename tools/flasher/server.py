@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import uuid
 from pathlib import Path
 from typing import Optional
 
@@ -359,6 +360,91 @@ async def delete_file(path: str):
     else:
         p.unlink()
     return {"path": path, "deleted": True}
+
+
+# ---------- Private link generation ----------
+
+# Token store: token -> {created, permissions, workspace_path, expires}
+link_tokens: dict[str, dict] = {}
+
+
+def get_vscode_web_url() -> str:
+    """Resolve the VS Code web URL for link generation."""
+    url = os.environ.get("VSCODE_WEB_URL")
+    if url:
+        return url
+    suffix = os.environ.get("BASE44_PUBLIC_HOST_SUFFIX")
+    if suffix:
+        return f"https://3000-{suffix}"
+    return "http://localhost:3000"
+
+
+class LinkGenerateRequest(BaseModel):
+    permissions: str = "read-write"
+    workspace_path: str = "/repo/workspace"
+    expires_in: int = 86400  # seconds (24 hours)
+
+
+@app.post("/api/link/generate")
+async def generate_link(req: LinkGenerateRequest):
+    """Generate a private link with read-write access to the workspace."""
+    token = str(uuid.uuid4())
+    link_tokens[token] = {
+        "created": time.time(),
+        "permissions": req.permissions,
+        "workspace_path": req.workspace_path,
+        "expires": time.time() + req.expires_in,
+    }
+    base_url = get_vscode_web_url()
+    link = f"{base_url}?token={token}"
+    return {
+        "token": token,
+        "link": link,
+        "permissions": req.permissions,
+        "expires_in": req.expires_in,
+    }
+
+
+@app.get("/api/link/validate")
+async def validate_link(token: str):
+    """Validate a private link token."""
+    if token not in link_tokens:
+        return {"valid": False, "reason": "Token not found"}
+    info = link_tokens[token]
+    if time.time() > info["expires"]:
+        del link_tokens[token]
+        return {"valid": False, "reason": "Token expired"}
+    return {
+        "valid": True,
+        "permissions": info["permissions"],
+        "workspace_path": info["workspace_path"],
+    }
+
+
+@app.delete("/api/link/revoke")
+async def revoke_link(token: str):
+    """Revoke a private link token."""
+    if token in link_tokens:
+        del link_tokens[token]
+        return {"revoked": True}
+    return {"revoked": False, "reason": "Token not found"}
+
+
+@app.get("/api/links")
+async def list_links():
+    """List all active link tokens (for management)."""
+    now = time.time()
+    active = [
+        {
+            "token": token,
+            "permissions": info["permissions"],
+            "created": info["created"],
+            "expires": info["expires"],
+        }
+        for token, info in link_tokens.items()
+        if now <= info["expires"]
+    ]
+    return {"active_links": active, "count": len(active)}
 
 
 if __name__ == "__main__":

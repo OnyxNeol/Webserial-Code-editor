@@ -19,6 +19,20 @@
 - `pio_core` volume caches PlatformIO platforms/toolchains across restarts. First board compile downloads platform packages (can take minutes).
 - VS Code web receives `FLASHER_API_URL=http://flasher:8001` so it can call the flasher service by container name.
 
+## OpenWebUI extension: VS Webserial
+
+- `tools/openwebui/vs_webserial.py` is an OpenWebUI tool that connects an AI assistant to the workspace and board flashing pipeline. Upload it to OpenWebUI under Workspace → Tools. Configure the `FLASHER_API_URL` valve to point at the flasher service's public URL.
+- Tools exposed: `list_files`, `read_file`, `write_file`, `delete_file`, `run_command`, `search_boards`, `list_devices`, `compile_code`, `flash_code`, `create_workspace_link`.
+- `create_workspace_link` calls `POST /api/link/generate` on the flasher to produce a private link with read-write permissions. The link includes a UUID token with a configurable expiry (default 24h). The user opens the link in a browser to access the VS Code web editor.
+- `tools/openwebui/README.md` has installation and configuration instructions.
+
+## Private link / token system
+
+- The flasher service manages tokens in memory (`link_tokens` dict). Endpoints: `POST /api/link/generate` (create), `GET /api/link/validate?token=` (validate), `DELETE /api/link/revoke?token=` (revoke), `GET /api/links` (list active).
+- The VS Code web server (`.base44/vscode-server.cjs`) validates tokens on every request. On first visit with `?token=xxx`, it validates against the flasher and sets an `HttpOnly` cookie (`vs_ws_token`) valid for 24h. Subsequent requests use the cookie. Without a valid token, page requests show an "Access Required" page and resource requests get 403.
+- Token validation results are cached for 5 minutes in the VS Code server to avoid calling the flasher on every request.
+- The flasher builds the link URL from `VSCODE_WEB_URL` env var, falling back to `https://3000-$BASE44_PUBLIC_HOST_SUFFIX`, then `http://localhost:3000`. `BASE44_PUBLIC_HOST_SUFFIX` is passed to the flasher service in compose.
+
 ## Disabled auto-completions
 
 - VS Code editor defaults have been modified in `vscode/src/vs/editor/common/config/editorOptions.ts` and `editorConfigurationSchema.ts` to disable all auto-completions: `quickSuggestions.other` → `'off'`, `suggestOnTriggerCharacters` → `false`, `inlineSuggest.enabled` → `false`, `parameterHints.enabled` → `false`, `wordBasedSuggestions` → `'off'`. These are source-level defaults; users can still re-enable via settings if desired.
