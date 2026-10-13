@@ -21,7 +21,7 @@
 
 ## OpenWebUI extension: VS Webserial
 
-- `tools/openwebui/vs_webserial.py` is an OpenWebUI tool that connects an AI assistant to the workspace and board flashing pipeline. Upload it to OpenWebUI under Workspace → Tools. Configure the `FLASHER_API_URL` valve to point at the flasher service's public URL.
+- `tools/openwebui/vs_webserial.py` is an OpenWebUI tool that connects an AI assistant to the workspace and board flashing pipeline. Upload it to OpenWebUI under Workspace → Tools. The flasher API URL is auto-discovered by probing `localhost:8001`, `host.docker.internal:8001`, and `127.0.0.1:8001` — no manual configuration needed. The `FLASHER_API_URL` valve is an optional override for non-standard setups.
 - Tools exposed: `list_files`, `read_file`, `write_file`, `delete_file`, `run_command`, `search_boards`, `list_devices`, `compile_code`, `flash_code`, `create_workspace_link`.
 - `create_workspace_link` calls `POST /api/link/generate` on the flasher to produce a private link with read-write permissions. The link includes a UUID token with a configurable expiry (default 24h). The user opens the link in a browser to access the VS Code web editor.
 - `tools/openwebui/README.md` has installation and configuration instructions.

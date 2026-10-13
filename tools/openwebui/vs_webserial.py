@@ -1,9 +1,9 @@
 """
 title: VS Webserial
 author: VS Webserial
-version: 0.1.0
+version: 0.2.0
 required_open_webui_version: 0.3.0
-description: Connect AI to a VS Code web workspace with board flashing pipeline. The AI can read/write files, compile and flash code to 1000+ boards, run shell commands, and generate private read-write links for users to access the workspace.
+description: Connect AI to a VS Code web workspace with board flashing pipeline. The AI can read/write files, compile and flash code to 1000+ boards, run shell commands, and generate private read-write links for users to access the workspace. The flasher API URL is auto-discovered — no manual configuration needed.
 """
 
 import json
@@ -17,16 +17,39 @@ class Tools:
 
     class Valves(BaseModel):
         FLASHER_API_URL: str = Field(
-            default="http://localhost:8001",
-            description="Base URL of the VS Webserial flasher API service."
+            default="",
+            description="Optional: override the flasher API URL. Leave empty for auto-discovery."
         )
 
     def __init__(self):
         self.valves = self.Valves()
+        self._discovered_url = None
+
+    def _get_flasher_url(self) -> str:
+        """Return the flasher API URL, auto-discovering if not configured."""
+        if self.valves.FLASHER_API_URL:
+            return self.valves.FLASHER_API_URL
+        if self._discovered_url:
+            return self._discovered_url
+        # Auto-discover by probing common locations
+        candidates = [
+            "http://localhost:8001",
+            "http://host.docker.internal:8001",
+            "http://127.0.0.1:8001",
+        ]
+        for url in candidates:
+            try:
+                r = requests.get(f"{url}/api/health", timeout=3)
+                if r.status_code == 200 and r.json().get("status") == "ok":
+                    self._discovered_url = url
+                    return url
+            except Exception:
+                continue
+        return "http://localhost:8001"
 
     def _post(self, endpoint: str, payload: dict, timeout: int = 120) -> dict:
         r = requests.post(
-            f"{self.valves.FLASHER_API_URL}{endpoint}",
+            f"{self._get_flasher_url()}{endpoint}",
             json=payload,
             timeout=timeout,
         )
@@ -35,7 +58,7 @@ class Tools:
 
     def _get(self, endpoint: str, params: dict = None, timeout: int = 60) -> dict:
         r = requests.get(
-            f"{self.valves.FLASHER_API_URL}{endpoint}",
+            f"{self._get_flasher_url()}{endpoint}",
             params=params,
             timeout=timeout,
         )
@@ -85,7 +108,7 @@ class Tools:
         """
         try:
             r = requests.delete(
-                f"{self.valves.FLASHER_API_URL}/api/workspace/file",
+                f"{self._get_flasher_url()}/api/workspace/file",
                 params={"path": path},
                 timeout=30,
             )

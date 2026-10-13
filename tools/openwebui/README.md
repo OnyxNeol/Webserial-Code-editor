@@ -19,11 +19,13 @@ An [OpenWebUI](https://github.com/open-webui/open-webui) tool that connects an A
 
 ## Configuration
 
-After installing, set the **Valves**:
+The flasher API URL is **auto-discovered** — no manual configuration needed. The extension probes `http://localhost:8001`, `http://host.docker.internal:8001`, and `http://127.0.0.1:8001` on first use and caches the working URL.
+
+If your flasher is on a different host, optionally set the **Valves**:
 
 | Valve | Default | Description |
 |-------|---------|-------------|
-| `FLASHER_API_URL` | `http://localhost:8001` | Base URL of the VS Webserial flasher API service. Set this to the public URL of the flasher service (e.g. `https://8001-your-host.example`). |
+| `FLASHER_API_URL` | _(empty — auto-discover)_ | Optional override for the flasher API URL. Leave empty for auto-discovery. |
 
 ## Available tools
 
