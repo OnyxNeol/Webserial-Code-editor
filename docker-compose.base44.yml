@@ -1,0 +1,17 @@
+services:
+  code-server:
+    image: codercom/code-server:latest
+    ports:
+      - "3000:8080"
+    environment:
+      - BASE44_PREVIEW_MODE=1
+    command: --auth none --bind-addr 0.0.0.0:8080 /home/coder/project
+    volumes:
+      - ./workspace:/home/coder/project
+    restart: on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
