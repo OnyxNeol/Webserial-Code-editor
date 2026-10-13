@@ -1,1 +1,0 @@
-# Welcome to VS Code Web Editor\n\nThis is a browser-based code editor powered by Monaco (the same editor engine as VS Code).\n\nTry:\n- Create a new file\n- Edit and press Ctrl+S to save\n- Use the Search panel to find text across files\n

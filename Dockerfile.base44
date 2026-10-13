@@ -1,0 +1,12 @@
+FROM node:24-bookworm
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 make g++ pkg-config \
+    libsecret-1-dev libxkbfile-dev libkrb5-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy full source so preinstall scripts and build deps can resolve
+COPY vscode /vscode
+WORKDIR /vscode
+RUN npm install --legacy-peer-deps
