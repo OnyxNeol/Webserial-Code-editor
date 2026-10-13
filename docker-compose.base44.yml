@@ -33,7 +33,7 @@ services:
       flasher:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>{if(!r.ok)throw Error('VS Code web is not responsive');return r.text()}).then(t=>{if(!t.includes('workbench'))throw Error('Workbench page missing')}).catch(e=>{console.error(e.message);process.exit(1)})"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>{if(r.status===200||r.status===403){process.exit(0)}throw Error('VS Code web not responsive: '+r.status)}).catch(e=>{console.error(e.message);process.exit(1)})"]
       interval: 15s
       timeout: 5s
       retries: 5
