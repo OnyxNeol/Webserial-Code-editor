@@ -1,28 +1,10 @@
-# Base44 Setup Notes
+# Base44 VS Code web development notes
 
-## What This Repo Is
-
-This repository is the **ecode** project — a documentation-only repo for a native C++ code editor. The actual source code lives in the [eepp repository](https://github.com/SpartanJ/eepp). This repo contains only README, docs, issue templates, and a release workflow.
-
-## What Was Built
-
-Since the original repo has no runnable web application, a **Monaco-based web code editor** (the same editor engine as VS Code) was added to provide a VS Code-like web experience that works in the preview. The preview proxy does not support WebSocket, so code-server (which requires WebSocket) doesn't work — this HTTP-only editor does.
-
-### Architecture
-- **Backend**: Express.js server (`server.js`) serving static files and a REST file API (list, read, write, delete)
-- **Frontend**: Vanilla JS + Monaco Editor loaded from CDN (`public/`)
-- **Workspace**: Files are stored in `workspace/` directory
-- **No WebSocket required** — all communication is over HTTP
-
-### Running
-```bash
-docker compose -f docker-compose.base44.yml up -d
-```
-App serves on port 3000. Health check at `/healthz`.
-
-### Key Files
-- `server.js` — Express server with file API
-- `public/index.html` — Main page
-- `public/app.js` — Editor logic (file tree, tabs, search, save)
-- `public/style.css` — VS Code dark theme styling
-- `docker-compose.base44.yml` — Compose setup
+- The former custom Monaco/Express editor is gone. The preview runs the official Microsoft VS Code source checkout in `vscode/`, via Microsoft's `@vscode/test-web` source-mode server. It is Code - OSS for the browser, not code-server or the native ecode application described by the original README.
+- `vscode/` is a pinned Git submodule of `https://github.com/microsoft/vscode.git`; `.gitmodules` is required for fresh imports. Compose initializes the submodule if its source checkout is missing.
+- Use `docker compose -f docker-compose.base44.yml up -d --build`. Port 3000 serves the workbench. Root and build dependencies are installed sequentially from their current lockfiles into separate Docker volumes at every container start. `--ignore-scripts` intentionally avoids Electron and native desktop install hooks for this browser-only runtime.
+- `.base44/vscode-dev.mjs` first copies the dependency-provided codicon font, then invokes the repository's official `build/next/index.ts bundle --target web --out out`. Per-file transpilation alone is not sufficient for the current ESM browser launcher. Source changes are polled and rebuild the browser bundles. Reload the page after rebuilding; this launcher does not inject HMR.
+- `.base44/vscode-server.cjs` uses the official test-web app factory. With `BASE44_PREVIEW_MODE` exactly `1`, it enables Koa's forwarded-header handling and normalizes the origin to `https://3000-${BASE44_PUBLIC_HOST_SUFFIX}`. This prevents mixed-content module requests and incorrect sandbox proxy URLs. With the flag unset or any other value, Koa's original direct HTTP/Host behavior is preserved. No authentication, CSP, cookies, or TLS checks are disabled.
+- The web workbench, syntax grammars, and themes load from source. Browser extension bundles are not compiled yet; IntelliSense and features supplied by those extensions need additional extension-specific dependency installation and `npm run compile-web`. Terminal/native filesystem/backend features are not provided by this standalone browser development server. Do not describe this as the full desktop IDE.
+- Verification: `curl -f http://localhost:3000/` and request `/static/sources/out/vs/workbench/workbench.web.main.internal.js` plus its `.css`. Then verify the real preview renders `.monaco-workbench`, open a new unsaved text editor, and type into it. Check runtime errors as well as HTTP status; an HTTP 200 page alone previously rendered blank.
+- `vscode/out`, dependency directories, and generated codicon fonts are build outputs, not source to commit. Never serve the old prebuilt `app-vscode-web` image: Compose uses plain `node:24-bookworm` with the checkout bind-mounted.

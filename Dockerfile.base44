@@ -6,7 +6,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy full source so preinstall scripts and build deps can resolve
-COPY vscode /vscode
+# Kept only as an optional native-build toolchain; development runs from
+# bind-mounted source with lockfile installation defined in Compose.
 WORKDIR /vscode
-RUN npm install --legacy-peer-deps

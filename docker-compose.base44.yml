@@ -1,26 +1,38 @@
 services:
   vscode-web:
-    build:
-      context: .
-      dockerfile: Dockerfile.base44
+    image: node:24-bookworm
     working_dir: /vscode
     ports:
       - "3000:3000"
     volumes:
+      - .:/repo
       - ./vscode:/vscode
+      - ./.base44:/base44:ro
       - vscode_node_modules:/vscode/node_modules
       - vscode_build_node_modules:/vscode/build/node_modules
       - vscode_build:/vscode/.build
     environment:
-      - BASE44_PREVIEW_MODE=1
-    command: ["sh", "-ec", "npx gulp compile-web && ./scripts/code-web.sh --host 0.0.0.0 --port 3000"]
+      - BASE44_PREVIEW_MODE
+      - BASE44_PUBLIC_HOST_SUFFIX
+      - CHOKIDAR_USEPOLLING=true
+      - CHOKIDAR_INTERVAL=1000
+    # Browser-only development does not need Electron/native dependency hooks.
+    # Install from the checkout's lockfiles after volumes have been mounted.
+    command:
+      - bash
+      - -ec
+      - |
+        if ! test -f package.json; then git -C /repo submodule update --init --depth 1 vscode; fi
+        npm ci --ignore-scripts --no-audit --no-fund
+        npm --prefix build ci --ignore-scripts --no-audit --no-fund
+        exec node /base44/vscode-dev.mjs
     restart: on-failure
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:3000/ || exit 1"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>{if(!r.ok)throw Error('VS Code web is not responsive');return r.text()}).then(t=>{if(!t.includes('workbench'))throw Error('Workbench page missing')}).catch(e=>{console.error(e.message);process.exit(1)})"]
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 600s
+      start_period: 300s
 
 volumes:
   vscode_node_modules:
